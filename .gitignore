@@ -1,2 +1,7 @@
 __pycache__
 .ropeproject
+ChallengeDoc/*.aux
+ChallengeDoc/*.log
+ChallengeDoc/*.pdf
+ChallengeDoc/*.synctex.gz
+

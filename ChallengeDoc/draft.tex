@@ -1,0 +1,37 @@
+\documentclass{article}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{grffile}
+\usepackage{bm}
+
+\begin{document}
+
+
+\section*{Draft}
+Group DMML05: Nils Ziermann, Bjarne Gau, Colin Clausen
+\\
+We have decided to do the following things:
+\\
+
+\begin{itemize}
+\item Ensemble of existing methods.
+\\
+We will create various ensembles from existing classifiers and experiment with leaving out 
+single classifiers to measure their effect on the performance of the overall ensemble.
+The reason for trying this is because ensembles typically deliver better performance than single classifiers.
+
+\item SELU activated neural networks
+\\
+We will experiment with neural networks that use the SELU activation function (see https://arxiv.org/pdf/1706.02515.pdf). These promise to improve the performance of simple feeed forward neural nets without the use of convolutions or batch normalization.
+
+\item Random Search of Hyperparamters
+\\
+We will search for good hyperparameters in our experiments by randomly sampling hyperparameter configurations from reasonable ranges and evaluating them. This will be limited by our available computational power. This approach prevents us from having to come up with good hyperparameters for learning algorithmns that we have never seen before.
+
+\end{itemize}
+
+
+
+
+\end{document}
