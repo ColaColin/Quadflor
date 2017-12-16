@@ -69,8 +69,11 @@ An example call with tf-idf features and stochastic gradient descent classifier:
 
 ```sh
 cd Code/lucid_ml
-python3 run.py -tf sgd -k Code/lucid_ml/file_paths.json -K example-titles --interactive
+python3 run.py -tf sgd -k file_paths.json -K example-titles -x
 ```
 
 where `file_paths.json` should contain the key given by `-K` specifying the
 paths to data (`X`), the gold standard (`y`), and the thesaurus (`thes`).
+
+-x means a single pass of training will be run and results reported. 
+-X could be used for full cross validation.
