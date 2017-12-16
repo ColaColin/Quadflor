@@ -5,3 +5,4 @@ ChallengeDoc/*.log
 ChallengeDoc/*.pdf
 ChallengeDoc/*.synctex.gz
 Resources/sample
+Code/lucid_ml/sample_paths.json
