@@ -31,7 +31,6 @@ def _batch_generator(X, y, batch_size, shuffle):
         counter += 1
         yield X_batch, y_batch
         if counter == number_of_batches:
-            print("tock");
             if shuffle:
                 np.random.shuffle(sample_index)
             counter = 0
