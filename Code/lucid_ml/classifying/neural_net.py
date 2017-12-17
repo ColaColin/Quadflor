@@ -24,13 +24,14 @@ def _batch_generator(X, y, batch_size, shuffle):
         counter += 1
         yield X_batch, y_batch
         if counter == number_of_batches:
+            print("tock");
             if shuffle:
                 np.random.shuffle(sample_index)
             counter = 0
 
 
 def _batch_generatorp(X, batch_size):
-    number_of_batches = X.shape[0] / np.ceil(X.shape[0] / batch_size)
+    number_of_batches = np.ceil(X.shape[0] / batch_size)
     counter = 0
     sample_index = np.arange(X.shape[0])
     while True:
@@ -57,15 +58,17 @@ class MLP(BaseEstimator):
             self.model.add(Dense(y.shape[1]))
             self.model.add(Activation(self.final_activation))
             self.model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.01))
+        bsize = 256
         self.model.fit_generator(generator=_batch_generator(X, y, 256, True),
-                                 samples_per_epoch=X.shape[0], nb_epoch=20, verbose=self.verbose)
+                                 samples_per_epoch=np.ceil(X.shape[0] / bsize), nb_epoch=20, verbose=self.verbose)
 
     def predict(self, X):
         pred = self.predict_proba(X)
         return sparse.csr_matrix(pred > 0.2)
 
     def predict_proba(self, X):
-        pred = self.model.predict_generator(generator=_batch_generatorp(X, 512), val_samples=X.shape[0])
+        bsize = 512
+        pred = self.model.predict_generator(generator=_batch_generatorp(X, bsize), val_samples=np.ceil(X.shape[0] / bsize), verbose=self.verbose)
         return pred
 
 
