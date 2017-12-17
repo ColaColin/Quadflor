@@ -8,6 +8,8 @@ from timeit import default_timer
 from classifying.neural_net import MLP, ThresholdingPredictor
 from classifying.stack_lin_reg import LinRegStack
 
+from classifying.selu_net import SeluNet
+
 os.environ['OMP_NUM_THREADS'] = '1'  # For parallelization use n_jobs, this gives more control.
 import numpy as np
 from scipy.stats import entropy
@@ -188,7 +190,7 @@ def run(options):
         X_train, X_test, Y_train, Y_test = X[train], X[test], Y[train], Y[test]
 
         # mlp doesn't seem to like being stuck into a new process...
-        if options.debug or options.clf_key in {'mlp', 'mlpthr'}:
+        if options.debug or options.clf_key in {'selunet', 'mlp', 'mlpthr', 'nam'}:
             Y_pred, Y_train_pred = fit_predict(X_test, X_train, Y_train, options, tr)
         else:
             Y_pred, Y_train_pred = fit_predict_new_process(X_test, X_train, Y_train, options, tr)
@@ -308,6 +310,7 @@ def create_classifier(options, num_concepts):
         "rocchiodt": ClassifierStack(base_classifier=RocchioClassifier(metric = 'cosine'), n_jobs=options.jobs, n=options.k),
         "logregressdt": ClassifierStack(base_classifier=logregress, n_jobs=options.jobs, n=options.k),
         "mlp": mlp,
+        "selunet": SeluNet(verbose=options.verbose),
         "nam": ThresholdingPredictor(MLP(verbose=options.verbose, final_activation='sigmoid'), alpha=options.alpha, stepsize=0.01, verbose=options.verbose),
         "mlpthr": LinRegStack(mlp, verbose=options.verbose),
         "mlpdt" : ClassifierStack(base_classifier=mlp, n_jobs=options.jobs, n=options.k)
@@ -422,7 +425,7 @@ def _generate_parsers():
     classifier_options.add_argument('-f', '--classifier', dest="clf_key", default="nn", help=
     "Specify the final classifier.", choices=["nn", "brknna", "brknnb", "bbayes", "mbayes", "lsvc",
                                               "sgd", "sgddt", "rocchio", "rocchiodt", "logregress", "logregressdt",
-                                              "mlp", "listnet", "l2rdt", 'mlpthr', 'mlpdt', 'nam'])
+                                              "selunam", "selunet", "mlp", "listnet", "l2rdt", 'mlpthr', 'mlpdt', 'nam'])
     classifier_options.add_argument('-a', '--alpha', dest="alpha", type=float, default=1e-7, help= \
         "Specify alpha parameter for stochastic gradient descent")
     classifier_options.add_argument('-n', dest="k", type=int, default=1, help=

@@ -66,7 +66,7 @@ class MLP(BaseEstimator):
             self.model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.01))
         bsize = 256
         self.model.fit_generator(generator=_batch_generator(X, y, 256, True),
-                                 samples_per_epoch=np.ceil(X.shape[0] / bsize), nb_epoch=20, verbose=self.verbose)
+                                 samples_per_epoch=np.ceil(X.shape[0] / bsize), nb_epoch=100, verbose=self.verbose)
 
     def predict(self, X):
         pred = self.predict_proba(X)
