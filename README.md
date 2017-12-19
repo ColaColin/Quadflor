@@ -77,3 +77,12 @@ paths to data (`X`), the gold standard (`y`), and the thesaurus (`thes`).
 
 -x means a single pass of training will be run and results reported. 
 -X could be used for full cross validation.
+
+## Example Usage 2
+
+```
+python3 run.py -v -tf sgd -F -k sample_paths.json -K sample-fulltext -x -p --persist_to /example/directory
+```
+Enhances the first example by verbose output, -v, full text classification, -F, and persistance of features to more quickly load them.
+
+
