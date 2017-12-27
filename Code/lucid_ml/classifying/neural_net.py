@@ -64,6 +64,10 @@ class MLP(BaseEstimator):
             self.model.add(Dense(y.shape[1]))
             self.model.add(Activation(self.final_activation))
             self.model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.01))
+            
+        if self.verbose:
+            self.model.summary();
+        
         bsize = 256
         self.model.fit_generator(generator=_batch_generator(X, y, 256, True),
                                  samples_per_epoch=np.ceil(X.shape[0] / bsize), nb_epoch=100, verbose=self.verbose)

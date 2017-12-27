@@ -101,6 +101,8 @@ def _batch_generatorp(X, batch_size):
 
 def _epoch_lr(epoch):
     lr = 0.001;
+    if epoch > 80:
+        lr = 0.0001;
     return lr;
 
 class SeluNet(BaseEstimator):
@@ -111,19 +113,32 @@ class SeluNet(BaseEstimator):
             
     def fit(self, X, y):
         if not self.model: 
-            self.model = create_network(X.shape[1], [2048] + [1024] * 2, y.shape[1],
+            # std thr is 0.142
+            # on sample title pretty good: [2048] + [1024] * 2
+            # on sample full pretty good:
+            # bsize: 256
+            # [512] + [1024] * 2: 0.355
+            # [512] * 3: 0.340
+            # bsize: 64, 100 epochs
+            # [700] + [1024] * 3 (lr 0.001): 0.284
+            # [700] + [1024] * 3 (lr 0.001 + 0.0001 @ 80): 0.231
+            # [700] + [1024] * 3 (lr 0.001 + 0.0001 @ 80, thr 0.12): 0.303
+            # [700] + [1024] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.12): 0.355
+            # [700] + [1400] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.125): 0.363
+            # [700] + [2048] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.125):
+            self.model = create_network(X.shape[1], [700] + [2048] * 2, y.shape[1],
                 final_activation = self.final_activation, verbose = self.verbose)
         
-        bsize = 256
+        bsize = 64
         self.model.fit_generator(generator=_batch_generator(X, y, bsize, True),
                                  samples_per_epoch=np.ceil(X.shape[0] / bsize), nb_epoch = 100, verbose = self.verbose, callbacks=[LearningRateScheduler(_epoch_lr)])
 
     def predict(self, X):
         pred = self.predict_proba(X)
-        return sparse.csr_matrix(pred > 0.142)
+        return sparse.csr_matrix(pred > 0.125)
 
     def predict_proba(self, X):
-        bsize = 512
+        bsize = 128
         pred = self.model.predict_generator(generator=_batch_generatorp(X, bsize), val_samples=np.ceil(X.shape[0] / bsize), verbose=self.verbose)
         return pred
 
