@@ -125,8 +125,8 @@ class SeluNet(BaseEstimator):
             # [700] + [1024] * 3 (lr 0.001 + 0.0001 @ 80, thr 0.12): 0.303
             # [700] + [1024] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.12): 0.355
             # [700] + [1400] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.125): 0.363
-            # [700] + [2048] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.125):
-            self.model = create_network(X.shape[1], [700] + [2048] * 2, y.shape[1],
+            # [700] + [2048] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.125): 0.34
+            self.model = create_network(X.shape[1], [700] + [1400] * 2, y.shape[1],
                 final_activation = self.final_activation, verbose = self.verbose)
         
         bsize = 64
