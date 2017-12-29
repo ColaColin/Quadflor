@@ -317,7 +317,7 @@ def create_classifier(options, num_concepts):
         "mlpdt" : ClassifierStack(base_classifier=mlp, n_jobs=options.jobs, n=options.k)
     }
 
-    classifiers["ensemble"] = OneVsRestClassifier(EnsembleSelectionClassifier(db_file = 'test_3.db', models=[BernoulliNB(alpha=options.alpha)]), n_jobs=options.jobs)
+    classifiers["ensemble"] = OneVsRestClassifier(EnsembleSelectionClassifier(models=[BernoulliNB(alpha=options.alpha)]), n_jobs=options.jobs)
     # Transformation: either bm25 or tfidf included in pipeline so that IDF of test data is not considered in training
     norm = "l2" if options.norm else None
     if options.bm25:
