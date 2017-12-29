@@ -39,6 +39,7 @@ from classifying.meancut_kneighbor_classifier import MeanCutKNeighborsClassifier
 from classifying.nearest_neighbor import NearestNeighbor
 from classifying.rocchioclassifier import RocchioClassifier
 from classifying.stacked_classifier import ClassifierStack
+from classifying.ensemble import EnsembleSelectionClassifier
 from utils.Extractor import load_dataset
 from utils.metrics import hierarchical_f_measure, f1_per_sample
 from utils.nltk_normalization import NltkNormalizer, word_regexp
@@ -315,6 +316,8 @@ def create_classifier(options, num_concepts):
         "mlpthr": LinRegStack(mlp, verbose=options.verbose),
         "mlpdt" : ClassifierStack(base_classifier=mlp, n_jobs=options.jobs, n=options.k)
     }
+
+    classifiers["ensemble"] = OneVsRestClassifier(EnsembleSelectionClassifier(db_file = 'test_3.db', models=[BernoulliNB(alpha=options.alpha)]), n_jobs=options.jobs)
     # Transformation: either bm25 or tfidf included in pipeline so that IDF of test data is not considered in training
     norm = "l2" if options.norm else None
     if options.bm25:
@@ -425,7 +428,7 @@ def _generate_parsers():
     classifier_options.add_argument('-f', '--classifier', dest="clf_key", default="nn", help=
     "Specify the final classifier.", choices=["nn", "brknna", "brknnb", "bbayes", "mbayes", "lsvc",
                                               "sgd", "sgddt", "rocchio", "rocchiodt", "logregress", "logregressdt",
-                                              "selunam", "selunet", "mlp", "listnet", "l2rdt", 'mlpthr', 'mlpdt', 'nam'])
+                                              "selunam", "selunet", "ensemble", "mlp", "listnet", "l2rdt", 'mlpthr', 'mlpdt', 'nam'])
     classifier_options.add_argument('-a', '--alpha', dest="alpha", type=float, default=1e-7, help= \
         "Specify alpha parameter for stochastic gradient descent")
     classifier_options.add_argument('-n', dest="k", type=int, default=1, help=
