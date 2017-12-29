@@ -319,7 +319,7 @@ class EnsembleSelectionClassifier(BaseEstimator, ClassifierMixin):
 
             curs.execute(select_stmt, [model_idx])
             pickled_model = curs.fetchone()[0]
-            model = loads(str(pickled_model))
+            model = loads(pickled_model)
 
             model_folds = []
 
@@ -375,14 +375,14 @@ class EnsembleSelectionClassifier(BaseEstimator, ClassifierMixin):
 
         # build probs array using the test sets for each internal CV fold
         for model_idx in range(self._n_models):
-            probs = np.zeros((len(X), self._n_classes))
+            probs = np.zeros((X.shape[0], self._n_classes))
 
             for fold_idx, fold in enumerate(self._folds):
                 _, test_inds = fold
 
                 curs.execute(select_stmt, [model_idx, fold_idx])
                 res = curs.fetchone()
-                model = loads(str(res[0]))
+                model = loads(res[0])
 
                 probs[test_inds] = model.predict_proba(X[test_inds])
 
