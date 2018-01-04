@@ -8,8 +8,13 @@ import numpy as np
 from sklearn.metrics import f1_score
 from sklearn.linear_model import Ridge
 
+# keras imports are only done inside functions and not globally, so that tensorflow is not initialized until those functions are called.
+# This makes it possible to call these functions with @processify.
+
 #import tensorflow as tf
 #from keras.backend.tensorflow_backend import set_session, get_session
+
+import tempfile
 
 import time
 
@@ -24,15 +29,61 @@ from sklearn.metrics import f1_score
 import random
 import string
 
+def create_locally_connected_network(input_size, units, output_size, final_activation, verbose, loss_func = 'categorical_crossentropy', metrics=[], optimizer='adam', inner_local_units_size=50):
+    # be nice to other processes that also use gpu memory by not monopolizing it on process start
+    # in case of vram memory limitations on large networks it may be helpful to not set allow_growth and grab it all directly
+    import tensorflow as tf
+    from keras.backend.tensorflow_backend import set_session, get_session
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    set_session(tf.Session(config=config))
+    
+    from keras.layers import Input, Dense, Activation, Dropout, BatchNormalization, LocallyConnected1D, ZeroPadding1D, Reshape, Flatten
+    from keras.models import Sequential
+    from keras.optimizers import Adam
+    from keras.layers.noise import AlphaDropout
+    from keras.models import Model
+
+    kinit = "lecun_normal";
+    model = Sequential()
+    
+    model.add(Reshape((input_size, 1), input_shape=(input_size,)))
+    
+    dropoutRate = 0.1
+    
+    stride = 500 #this cannot just be changed without fixing padsNeeded to be more general
+    padsNeeded = ((math.ceil(input_size / stride) + 1) * stride - input_size - 1) % stride
+    model.add(ZeroPadding1D(padding=(0, padsNeeded)))
+    model.add(LocallyConnected1D(units[0], 1000, strides=stride, kernel_initializer=kinit))
+    model.add(Activation("selu"))
+    
+    for u_cnt in units[1:]:
+        model.add(LocallyConnected1D(u_cnt, inner_local_units_size, strides=1, kernel_initializer=kinit))
+        model.add(Activation("selu"))
+        model.add(AlphaDropout(dropoutRate))
+
+    model.add(Flatten())
+
+    model.add(Dense(output_size, activation=final_activation, kernel_initializer=kinit))
+   
+    model.compile(loss=loss_func,
+                  optimizer=optimizer,
+                  metrics=metrics)
+                  
+    if verbose:
+        model.summary()
+    
+    return model
+
+
 def create_locally_connected_head_network(input_size, units, output_sizes, final_activations, verbose, loss_funcs = 'categorical_crossentropy', metrics=[], optimizer='adam'):
     # be nice to other processes that also use gpu memory by not monopolizing it on process start
-    # on the sample data set only ~700mb of vram is needed this way, instead of all of it
     # in case of vram memory limitations on large networks it may be helpful to not set allow_growth and grab it all directly
-#    import tensorflow as tf
-#    from keras.backend.tensorflow_backend import set_session, get_session
-#    config = tf.ConfigProto()
-#    config.gpu_options.allow_growth = True
-#    set_session(tf.Session(config=config))
+    import tensorflow as tf
+    from keras.backend.tensorflow_backend import set_session, get_session
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    set_session(tf.Session(config=config))
 
     from keras.layers import Input, Dense, Activation, Dropout, BatchNormalization, LocallyConnected1D, ZeroPadding1D, Reshape, Flatten
     from keras.models import Sequential
@@ -71,7 +122,7 @@ def create_locally_connected_head_network(input_size, units, output_sizes, final
     for o, a in zip(output_sizes, final_activations):
         l = headi;
         for oc, ac in zip(o, a):
-            l = Dense(oc, activation=ac)(l)
+            l = Dense(oc, activation=ac, kernel_initializer=kinit)(l) # in the original experiments the kernal initializer was not set correctly here. Likely no big change?
         outputs.append(l)
 
     model = Model(inputs=[inp], outputs=outputs)
@@ -113,12 +164,8 @@ def _batch_generator(X, y, batch_size, shuffle):
         X_batch = X[batch_index].toarray()
         y_batch = y[batch_index].toarray()
         
-        #y_counts = np.sum(y_batch, axis=1, keepdims=True)
-        
-        #y_batch /= y_counts
-        
         counter += 1
-        yield X_batch, y_batch #[y_batch, y_counts]
+        yield X_batch, y_batch
         if counter == number_of_batches:
             if shuffle:
                 np.random.shuffle(sample_index)
@@ -138,12 +185,6 @@ def _batch_generatorp(X, batch_size):
         yield X_batch
         if counter == number_of_batches:
             counter = 0
-
-def _epoch_lr(epoch):
-    lr = 0.0005;
-    if epoch > 40:
-        lr = 0.00005;
-    return lr;
 
 def find_weights_path_by(ending, workdir):
     files = os.listdir(workdir)
@@ -214,182 +255,94 @@ class SeluNet(BaseEstimator):
         
     def fit(self, X, y):
         if not self.model: 
-            # sample micro f1 scores:
-            # normal network:
-            # std thr is 0.142
-            # on sample title pretty good: [2048] + [1024] * 2
-            # on sample full pretty good:
-            # bsize: 256
-            # [512] + [1024] * 2: 0.355
-            # [512] * 3: 0.340
-            # bsize: 64, 100 epochs
-            # [700] + [1024] * 3 (lr 0.001): 0.284
-            # [700] + [1024] * 3 (lr 0.001 + 0.0001 @ 80): 0.231
-            # [700] + [1024] * 3 (lr 0.001 + 0.0001 @ 80, thr 0.12): 0.303
-            # [700] + [1024] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.12): 0.355
-            # [700] + [1400] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.125): 0.363
-            # [700] + [2048] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.125): 0.34
-            
-            # local head network:
-            # [100] + [512] * 3 (lr 0.001 + 0.0001 @ 80, thr, 0.125): 0.328
-            # [100] + [512] * 5 (lr 0.001 + 0.0001 @ 80, thr, 0.125): 
-            # [100] + [1024] * 5 (lr 0.001 + 0.0001 @ 80, thr, 0.125):
-            # [25] + [512] * 3 (lr 0.001 + 0.0001 @ 80, thr, 0.125): 0.325
-            # [25] + [512] * 3 (lr 0.001 + 0.0001 @ 80, thr, 0.15): 0.331
-            # [25] + [512] * 3 (lr 0.001 + 0.0001 @ 80, thr, 0.175): 0.343
-            # [25] + [512] * 3 (lr 0.001 + 0.0001 @ 80, thr, 0.215): 0.342
-            # [25] + [1024] * 3 (lr 0.001 + 0.0001 @ 80, thr, 0.125):
-            # [10] + [1024] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.125):
-            # [10] + [512] * 3 (lr 0.001 + 0.0001 @ 80, thr, 0.1): 0.348
-            # [10] + [512] * 3 (lr 0.001 + 0.0001 @ 80, thr, 0.065): 0.332
-            # [10] + [512] * 3 (lr 0.001 + 0.0001 @ 80, thr, 0.085): 0.319
-            
-            # [5] + [1024] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.175): 0.356/0.343
-            # [10] + [1024] * 1 (lr 0.001 + 0.0001 @ 80, thr, 0.175): 0.298
-            # [5] + [2048] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.175): 0.355
-            # [5] + [4096] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.185): 0.352
-
-            # [10] + [1500] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.19): 0.35
-            
-            # [10] + [1500] + [1000] (lr 0.001 + 0.0001 @ 80, thr, 0.19): 0.355
-            
-            # [10] + [1500] + [750] + [500] (lr 0.001 + 0.0001 @ 80, thr, 0.19): 0.318
-            # [3] + [1000] + [750] + [500] (lr 0.001 + 0.0001 @ 80, thr, 0.19): 0.291
-            
-            # [3] + [1000] + [750] + [500] (lr 0.001 + 0.0001 @ 80, thr, 0.11): 0.327
-            
-            # 80 epochs
-            # [3] + [1000] + [750] (lr 0.001 + 0.0001 @ 60, thr, 0.11): 0.322
-            
-            # 60 epochs
-            # [5] + [1500] + [1000] (lr 0.001 + 0.0001 @ 50, thr, 0.21): 0.321
-            
-            # 120 epochs
-            # [5] + [4096] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.19): 0.365
-
-            # 200 epochs, 128 bsize
-            # [5] + [8192] * 2 (lr 0.001 + 0.0001 @ 80, thr, 0.19): 0.34
-            
-            # bsize 32, 150 epochs
-            # [5] + [2048] * 3 (lr 0.001 + 0.0001 @ 80, thr, 0.185): fail
-            
-            #bsize 128
-            # [10] + [512] * 3 (lr 0.001 + 0.0001 @ 80, thr, 0.05): 0.287
-            
-            
-            # complete micro f1 scores:
-            
-            # [5] + [1500] + [1000] ????, 0.456
-            
-            #bsize 64, 120 epochs
-            # [10] + [4096] * 2 (lr 0.0005 + 0.00005 @ 80, thr, 0.19): 0.361
-            
-            #bsize 64, 65 epochs
-            # [5] + [1024] * 4 (lr 0.0005 + 0.00005 @ 40, thr, 0.19): 0.483
-            # [5] + [1024] * 2 (lr 0.0005 + 0.00005 @ 40, thr, 0.19): 0.527
-            
-            #bsize 128, 65 epochs
-            # [10] + [2048] * 2 (lr 0.0005 + 0.00005 @ 40, thr, 0.19): 0.54 (cv: ...)
-            
+ 
             # to compare the standard settings sgd gets something like
- #           avg_n_labels_gold: 5.236 (+/- 0.000) <> avg_n_labels_pred: 3.125 (+/- 0.000) <> f1_macro: 0.235 (+/- 0.000) <> f1_micro: 0.508 (+/- 0.000) <> f1_samples: 0.480 (+/- 0.000) <> #p_macro: 0.320 (+/- 0.000) <> p_micro: 0.679 (+/- 0.000) <> p_samples: 0.657 (+/- 0.000) <> r_macro: 0.205 (+/- 0.000) <> r_micro: 0.405 (+/- 0.000) <> r_samples: 0.422 (+/- 0.000)
+ #           avg_n_labels_gold: 5.236 (+/- 0.000) <> avg_n_labels_pred: 3.125 (+/- 0.000) <> f1_macro: 0.235 (+/- 0.000) <> f1_micro: 0.508 (+/- 0.000) <> f1_samples: 0.480 (+/- 0.000) <> p_macro: 0.320 (+/- 0.000) <> p_micro: 0.679 (+/- 0.000) <> p_samples: 0.657 (+/- 0.000) <> r_macro: 0.205 (+/- 0.000) <> r_micro: 0.405 (+/- 0.000) <> r_samples: 0.422 (+/- 0.000)
 #Duration: 9:23:23.939776
+            
+            # [10] + [2048] * 2, threshold 0.19, ~36 hours
+ #           avg_n_labels_gold: 5.240 (+/- 0.015) <> avg_n_labels_pred: 5.410 (+/- 0.245) <> f1_macro: 0.223 (+/- 0.006) <> f1_micro: 0.505 (+/- 0.009) <> f1_samples: 0.508 (+/- 0.005) <> p_macro: 0.245 (+/- 0.012) <> p_micro: 0.497 (+/- 0.017) <> p_samples: 0.555 (+/- 0.008) <> r_macro: 0.231 (+/- 0.005) <> r_micro: 0.513 (+/- 0.009) <> r_samples: 0.525 (+/- 0.009)
+
+            # [3] + [1024] * 2, threshold 0.19, ~21 hours
+            #avg_n_labels_gold: 5.240 (+/- 0.022) <> avg_n_labels_pred: 4.629 (+/- 0.133) <> f1_macro: 0.236 (+/- 0.004) <> f1_micro: 0.527 (+/- 0.003) <> f1_samples: 0.508 (+/- 0.004) <> p_macro: 0.281 (+/- 0.004) <> p_micro: 0.562 (+/- 0.010) <> p_samples: 0.568 (+/- 0.008) <> r_macro: 0.224 (+/- 0.005) <> r_micro: 0.497 (+/- 0.007) <> r_samples: 0.509 (+/- 0.008)
+            
+            # [2] + [512] * 2, threshold 0.19 ~22 hours
+            #avg_n_labels_gold: 5.240 (+/- 0.023) <> avg_n_labels_pred: 5.932 (+/- 0.596) <> f1_macro: 0.230 (+/- 0.006) <> f1_micro: 0.500 (+/- 0.013) <> f1_samples: 0.488 (+/- 0.010) <> p_macro: 0.248 (+/- 0.015) <> p_micro: 0.474 (+/- 0.033) <> p_samples: 0.493 (+/- 0.025) <> r_macro: 0.241 (+/- 0.007) <> r_micro: 0.532 (+/- 0.015) <> r_samples: 0.544 (+/- 0.016)
 
             
-            # [3] + [2048], [[1024, y.shape[1]], [1024, 1] 0.472
             
+            layerSizes = [2] + [512] * 2
             
-            # TODO threshold per class search instead of global guess?
-            # TODO the combination of sigmoid with cross entropy really should not make any sense
-            # figure out either a way to use softmax and kl divergence (how should the threshold work in that case?) or fix binary cross entropy
-            # or improve softmax + number of labels approach somehow...
-            
-            # [10] + [2048] * 2: 
- #           avg_n_labels_gold: 5.240 (+/- 0.015) <> avg_n_labels_pred: 5.410 (+/- 0.245) <> f1_macro: 0.223 (+/- 0.006) <> f1_micro: 0.505 (+/- 0.009) <> f1_samples: 0.508 (+/- 0.005) <> #p_macro: 0.245 (+/- 0.012) <> p_micro: 0.497 (+/- 0.017) <> p_samples: 0.555 (+/- 0.008) <> r_macro: 0.231 (+/- 0.005) <> r_micro: 0.513 (+/- 0.009) <> r_samples: 0.525 (+/- 0.009)
-
-            
+            # this is basically a guess. A more refined way to find the threshold would be nice. Simply searching it however seems to not work, see search_thresholds()
             self.thresholds = [0.19] * y.shape[1]
-            self.model = create_locally_connected_head_network(X.shape[1], [10] + [2048] * 2, [[y.shape[1]]], 
+            # this combination of categorical crossentropy and sigmoids is kinda weird. However the original mlp code of Quadflor also
+            # used it and it seems to work, unlike binary cross entropy, which seems to suffer from the fact that the outputs are very sparse(?)
+            self.model = create_locally_connected_head_network(X.shape[1], layerSizes, [[y.shape[1]]], 
                 loss_funcs=["categorical_crossentropy"], final_activations = [["sigmoid"]], verbose = self.verbose)
-            
-            #self.model = create_locally_connected_head_network(X.shape[1], [5] + [1024] * 2, [[y.shape[1]], [1]],
-            #    final_activations = [["softmax"], ["selu", "linear"]], loss_funcs=["categorical_crossentropy", "mse"], verbose = self.verbose)
-        
+
+            #self.model = create_locally_connected_network(X.shape[1], [2] * 10 + [1], y.shape[1], loss_func="categorical_crossentropy", final_activation="sigmoid", verbose=self.verbose)
+
         from keras.callbacks import LearningRateScheduler, ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
 
-        cachedir = "/MegaKeks/Dokumente/StudiGits/Quadflor/cache/"
+        cachedir = tempfile.gettempdir()
         
         tmpdir = os.path.join(cachedir, ''.join(random.choice(string.ascii_uppercase) for _ in range(7)))
-        
-        os.mkdir(tmpdir)
-        
-        vcode = 0
-        if self.verbose:
-            vcode = 1
-    
-        checkpointer = ModelCheckpoint(mode="max", monitor='f1_sample', filepath = os.path.join(tmpdir, "weights.{epoch:02d}-{f1_sample:.4f}.hdf5"), 
-                                        verbose = vcode, save_best_only = True)
-     
-        estopper = EarlyStopping(mode="max", monitor='f1_sample', min_delta=0, verbose= vcode, patience = 9);
 
-        lreducer = ReduceLROnPlateau(mode="max", monitor='f1_sample', factor=0.1, verbose = vcode, patience = 6, min_lr = 0.00001);
+        print("Will use %s as temporary directory. If execution fails this may need to be cleaned up by hand! For very large networks this process may require dozens of gigabytes of temporary storage. TODO: improve..." % tmpdir)
+        trainingComplete = False
+        try:
+            os.mkdir(tmpdir)
+            
+            vcode = 0
+            if self.verbose:
+                vcode = 1
         
-        
-        trainSlice = math.floor(X.shape[0] * 0.91)
-        
-        idxs = np.arange(X.shape[0])
-        np.random.shuffle(idxs)
-        
-        trainIdxs = idxs[:trainSlice]
-        valIdxs = idxs[trainSlice:]
-        
-        f1setter = createF1Callback(self, X[valIdxs], y[valIdxs])
-        
-        if self.verbose:
-            print("Will use %i examples for training and %i samples for validation" % (trainSlice, X.shape[0] - trainSlice))
-        
-        bsize = 128
-        self.model.fit_generator(generator=_batch_generator(X[trainIdxs], y[trainIdxs], bsize, True),
-                                 steps_per_epoch=np.ceil(trainSlice / bsize), 
-                                 epochs = 99999, # early stopping will take care of it
-                                 verbose = self.verbose,
-                                 #validation_data=_batch_generator(X[valIdxs], y[valIdxs], bsize, False),
-                                 #validation_steps=np.ceil((X.shape[0] - trainSlice)/bsize),
-                                 callbacks=[f1setter, checkpointer, lreducer, estopper])
-                                 
-        clear_weights(tmpdir);
-        bestWeights = find_weights_path_by("hdf5", tmpdir);
-        assert bestWeights != None
-        self.model.load_weights(bestWeights);
-        os.remove(bestWeights);
-        os.rmdir(tmpdir)
-        
-        #if self.verbose:
-        #    print("Will commence search for the best thresholds!")
-        
-        #self.search_thresholds(X[valIdxs], y[valIdxs])
-        
+            checkpointer = ModelCheckpoint(mode="max", monitor='f1_sample', filepath = os.path.join(tmpdir, "weights.{epoch:02d}-{f1_sample:.4f}.hdf5"), 
+                                            verbose = vcode, save_best_only = True)
+         
+            estopper = EarlyStopping(mode="max", monitor='f1_sample', min_delta=0, verbose= vcode, patience = 9);
+
+            lreducer = ReduceLROnPlateau(mode="max", monitor='f1_sample', factor=0.1, verbose = vcode, patience = 6, min_lr = 0.00001);
+            
+            
+            trainSlice = math.floor(X.shape[0] * 0.91)
+            
+            idxs = np.arange(X.shape[0])
+            np.random.shuffle(idxs)
+            
+            trainIdxs = idxs[:trainSlice]
+            valIdxs = idxs[trainSlice:]
+            
+            f1setter = createF1Callback(self, X[valIdxs], y[valIdxs])
+            
+            if self.verbose:
+                print("Will use %i examples for training and %i samples for validation" % (trainSlice, X.shape[0] - trainSlice))
+            
+            bsize = 64
+            self.model.fit_generator(generator=_batch_generator(X[trainIdxs], y[trainIdxs], bsize, True),
+                                     steps_per_epoch=np.ceil(trainSlice / bsize), 
+                                     epochs = 99999, # early stopping will take care of it
+                                     verbose = self.verbose,
+                                     #validation_data=_batch_generator(X[valIdxs], y[valIdxs], bsize, False),
+                                     #validation_steps=np.ceil((X.shape[0] - trainSlice)/bsize),
+                                     callbacks=[f1setter, checkpointer, lreducer, estopper])
+                                     
+            trainingComplete = True
+             
+        finally:      
+            clear_weights(tmpdir);
+            bestWeights = find_weights_path_by("hdf5", tmpdir);
+            if trainingComplete:
+                assert bestWeights != None
+                self.model.load_weights(bestWeights);
+            os.remove(bestWeights);
+            os.rmdir(tmpdir)
+
 
     def predict(self, X):
         bsize = 128
         pred = self.model.predict_generator(generator=_batch_generatorp(X, bsize), steps=np.ceil(X.shape[0] / bsize), verbose=self.verbose)
-        
         return sparse.csr_matrix(pred > self.thresholds)
-        
-#        vals = pred[0]
-#        counts = pred[1]
-        
-#        result = np.zeros_like(vals)
-        
-#        for li in range(vals.shape[0]):
-#            rval = [x for x in enumerate(vals[li])]
-#            count = int(round(counts[li][0]))
-#            if count < 1:
-#                count = 1
-#            bestIdxs = [a[0] for a in sorted(rval, key=lambda x: x[1], reverse=True)[:count]]
-#            result[li,bestIdxs] = 1
-        
-#        return sparse.csr_matrix(result > 0)
 
 
 if __name__ == "__main__":

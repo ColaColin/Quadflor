@@ -190,7 +190,7 @@ def run(options):
         X_train, X_test, Y_train, Y_test = X[train], X[test], Y[train], Y[test]
 
         # mlp doesn't seem to like being stuck into a new process...
-        if options.debug or options.clf_key in {'selunet', 'mlp', 'mlpthr', 'nam'}:
+        if options.debug or options.clf_key in {'mlp', 'mlpthr', 'nam'}: # they should work now, but I've not tested it...
             Y_pred, Y_train_pred = fit_predict(X_test, X_train, Y_train, options, tr)
         else:
             Y_pred, Y_train_pred = fit_predict_new_process(X_test, X_train, Y_train, options, tr)

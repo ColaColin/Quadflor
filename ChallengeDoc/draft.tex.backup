@@ -95,7 +95,7 @@ with 2 extra hidden layers after the locally connected layer, so 3 hidden layers
 \begin{table} [H]
  \centering
   \begin{tabular}{l | r}
-   \textbf{Network [10, 2048, 2048]} &  \\
+   Network [10, 2048, 2048] &  \\
    \hline
    \hline
    avg n labels gold & 5.240 $\pm 0.015$ \\
@@ -126,69 +126,68 @@ with 2 extra hidden layers after the locally connected layer, so 3 hidden layers
   \end{tabular}
 
   \begin{tabular}{l | r}
-   \textbf{Network [3, 1024, 1024]} &  \\
+   Network [3, 1024, 1024] &  \\
    \hline
    \hline
    avg n labels gold & 5.240 $\pm 0.022$ \\
    \hline
-   avg n labels pred & 4.629 $\pm 0.133$ \\
+   avg n labels pred & 5.410 $\pm 0.245$ \\
    \hline
-   f1 macro & 0.236 $\pm 0.004$ \\
+   f1 macro & 0.223 $\pm 0.006$ \\
    \hline
-   f1 micro &  0.527 $\pm 0.003$ \\
+   f1 micro & 0.505 $\pm 0.009$ \\
    \hline
-   f1 samples & 0.508 $\pm  0.004$ \\
+   f1 samples & 0.508 $\pm 0.005$ \\
    \hline
-   p macro & 0.281 $\pm 0.004$ \\
+   p macro & 0.245 $\pm 0.012$ \\
    \hline
-   p micro & 0.562 $\pm 0.010$ \\
+   p micro & 0.497 $\pm 0.017$ \\
    \hline
-   p samples &  0.568 $\pm 0.008$ \\
+   p samples & 0.555 $\pm 0.008$ \\
    \hline
-   r macro & 0.224 $\pm 0.005$ \\
+   r macro & 0.231 $\pm 0.005$ \\
    \hline
-   r micro & 0.497 $\pm 0.007$ \\
+   r micro & 0.531 $\pm 0.009$ \\
    \hline
-   r samples & 0.509 $\pm 0.008$ \\
+   r samples & 0.525 $\pm 0.009$ \\
    \hline
    10 fold cross validation run time & 21 hours \\
    \hline
-   network size & 22 million parameters \\
+   network size & 22 million \\
   \end{tabular}
 
   \begin{tabular}{l | r}
-   \textbf{Network [2, 512, 512]} &  \\
+   Network [2, 512, 512] &  \\
    \hline
    \hline
-   avg n labels gold & 5.240 $\pm 0.023$ \\
+   avg n labels gold & 5.240 $\pm $ \\
    \hline
-   avg n labels pred & 5.932 $\pm 0.596$ \\
+   avg n labels pred & $\pm $ \\
    \hline
-   f1 macro & 0.230 $\pm 0.006$ \\
+   f1 macro & $\pm $ \\
    \hline
-   f1 micro & 0.500 $\pm 0.013$ \\
+   f1 micro &  $\pm $ \\
    \hline
-   f1 samples & 0.488 $\pm 0.010$ \\
+   f1 samples &  $\pm $ \\
    \hline
-   p macro & 0.248 $\pm 0.015 $ \\
+   p macro &  $\pm $ \\
    \hline
-   p micro & 0.474 $\pm 0.033 $ \\
+   p micro &  $\pm $ \\
    \hline
-   p samples & 0.493 $\pm 0.025$ \\
+   p samples & $\pm $ \\
    \hline
-   r macro & 0.241 $\pm 0.007$ \\
+   r macro &  $\pm $ \\
    \hline
-   r micro & 0.532  $\pm  0.015$ \\
+   r micro & $\pm $ \\
    \hline
-   r samples & 0.544 $\pm 0.016 $ \\
+   r samples &  $\pm $ \\
    \hline
-   10 fold cross validation run time & 22 hours \\
+   10 fold cross validation run time &  \\
    \hline
-   network size & 10.7 million parameters \\
+   network size & 10.7 million \\
   \end{tabular}
   
-  \caption{Results of SELU networks. The first number of the network descriptions shows the number of feature layers of the locally connected layers. It can be seen that overall the 
-  middle sized network 3,1024,1024 performs best.}
+  \caption{Results of SELU networks. The first number of the network descriptions shows the number of feature layers of the locally connected layers}
   \label{fig:selu_results}
 \end{table}
 

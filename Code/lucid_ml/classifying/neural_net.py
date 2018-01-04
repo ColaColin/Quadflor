@@ -3,20 +3,11 @@
 from scipy import sparse
 
 from sklearn.base import BaseEstimator
-from keras.layers import Dense, Activation, Dropout, BatchNormalization
-from keras.models import Sequential
-from keras.optimizers import Adam
+
+
 import numpy as np
 from sklearn.metrics import f1_score
 from sklearn.linear_model import Ridge
-
-# be nice to other processes that also use gpu memory by not monopolizing it on process start
-# on the sample data set only ~700mb of vram is needed this way, instead of all of it
-import tensorflow as tf
-from keras.backend.tensorflow_backend import set_session
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
-set_session(tf.Session(config=config))
 
 def _batch_generator(X, y, batch_size, shuffle):
     number_of_batches = np.ceil(X.shape[0] / batch_size)
@@ -56,6 +47,20 @@ class MLP(BaseEstimator):
         self.final_activation = final_activation
 
     def fit(self, X, y):
+    
+        # be nice to other processes that also use gpu memory by not monopolizing it on process start
+        # on the sample data set only ~700mb of vram is needed this way, instead of all of it
+        # in case of vram memory limitations on large networks it may be helpful to not set allow_growth and grab it all directly
+        import tensorflow as tf
+        from keras.backend.tensorflow_backend import set_session, get_session
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        set_session(tf.Session(config=config))
+    
+        from keras.layers import Dense, Activation, Dropout, BatchNormalization
+        from keras.models import Sequential
+        from keras.optimizers import Adam
+        
         if not self.model:
             self.model = Sequential()
             self.model.add(Dense(1000, input_dim=X.shape[1]))
