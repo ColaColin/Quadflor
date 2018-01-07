@@ -53,9 +53,19 @@ Our initial ideas were based on the example dataset that was very limited in siz
 The main problem was not the number of input documents, but the size of the input vocabulary. For the example dataset this was roughly 35000, which seemed managable. However this size turned out to be not static and grew
 with the dataset. The complete dataset uses a vocabulary of roughly 1.3 million words. This meant we had to adapt our suggested approaches.
 
-\subsubsection*{Ensemblemethods}
-
-TODO
+\subsubsection*{Ensemble Methods}
+We decided to adapt PyEnsemble\footnote{https://github.com/dclambert/pyensemble}
+which is a python implementation of Caruana et al's Ensemble Selection
+algorithm\footnote{http://www.cs.cornell.edu/~caruana/ctp/ct.papers/caruana.icml04.icdm06long.pdf}.
+\\
+The algorithm automatically creates and optimizes an ensemble consisting of
+multiple models. A model is in our case given by a classifier and a set of
+hyperparameters belonging to the classifier. This means that we can create
+multiple models for one classifier with different hyperparameters and the
+algorithm should choose the best one for the given task. In this case a random
+search of hyperparameters is not needed. \\
+Unfortunately we couldn't finish the adaptation until now. Therefore we
+currently have no results of this approach.
 
 \subsection*{SELU activated neural networks}
 
